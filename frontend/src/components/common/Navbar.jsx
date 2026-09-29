@@ -149,7 +149,15 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* User Profile Pill */}
+            {/* User Profile Pill / Sign in */}
+            {!user ? (
+              <Link
+                to="/login"
+                className="ml-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-xs font-semibold text-white transition-colors"
+              >
+                Sign in
+              </Link>
+            ) : (
             <div className="flex items-center gap-3 pl-2 border-l border-white/10">
               <div className="flex items-center gap-2.5 bg-surface-elevated/80 border border-white/10 rounded-2xl px-3 py-1.5">
                 <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-primary-500 to-indigo-500 flex items-center justify-center font-bold text-xs text-white uppercase shadow-sm">
@@ -176,6 +184,7 @@ export default function Navbar() {
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
+            )}
           </div>
 
           {/* Mobile menu toggle button */}
@@ -221,6 +230,9 @@ export default function Navbar() {
             );
           })}
 
+          {!user ? (
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="block text-center px-4 py-2 rounded-xl bg-primary-600 text-xs font-semibold text-white">Sign in</Link>
+          ) : (
           <div className="pt-4 border-t border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center font-bold text-xs text-white uppercase">
@@ -238,6 +250,7 @@ export default function Navbar() {
               <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           </div>
+          )}
         </div>
       )}
     </nav>

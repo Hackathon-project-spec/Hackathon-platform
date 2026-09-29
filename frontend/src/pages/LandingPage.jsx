@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Zap,
   ArrowRight,
@@ -24,7 +24,9 @@ import { formatDate, formatTimeRemaining } from '../utils/formatters';
 
 export default function LandingPage() {
   const { currentEvent } = useEvent();
-  const { demoAccounts, switchDemoAccount } = useAuth();
+  const { demoAccounts, switchDemoAccount, demoMode } = useAuth();
+  const navigate = useNavigate();
+  const playAs = (i) => (demoMode ? switchDemoAccount(demoAccounts[i]) : navigate('/login'));
 
   const features = [
     {
@@ -168,9 +170,9 @@ export default function LandingPage() {
               variant="outline"
               size="sm"
               className="w-full text-xs"
-              onClick={() => switchDemoAccount(demoAccounts[0])}
+              onClick={() => playAs(0)}
             >
-              Play as Pat (Participant)
+              {demoMode ? 'Play as' : 'Sign in as'} Pat (Participant)
             </Button>
           </Card>
 
@@ -186,9 +188,9 @@ export default function LandingPage() {
               variant="outline"
               size="sm"
               className="w-full text-xs"
-              onClick={() => switchDemoAccount(demoAccounts[2])}
+              onClick={() => playAs(2)}
             >
-              Play as Ola (Organizer)
+              {demoMode ? 'Play as' : 'Sign in as'} Ola (Organizer)
             </Button>
           </Card>
 
@@ -204,9 +206,9 @@ export default function LandingPage() {
               variant="outline"
               size="sm"
               className="w-full text-xs"
-              onClick={() => switchDemoAccount(demoAccounts[3])}
+              onClick={() => playAs(3)}
             >
-              Play as Jan (Judge)
+              {demoMode ? 'Play as' : 'Sign in as'} Jan (Judge)
             </Button>
           </Card>
 

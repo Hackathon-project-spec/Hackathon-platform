@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, demoMode } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,10 +17,10 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   const DEMO_CREDENTIALS = [
-    { username: 'alice_participant', role: 'Participant', color: 'text-emerald-400' },
-    { username: 'ola_organizer', role: 'Organizer', color: 'text-amber-400' },
-    { username: 'jan_judge', role: 'Judge', color: 'text-purple-400' },
-    { username: 'alex_admin', role: 'Admin', color: 'text-red-400' },
+    { username: 'participant1', role: 'Participant', color: 'text-emerald-400' },
+    { username: 'organizer1', role: 'Organizer', color: 'text-amber-400' },
+    { username: 'judge1', role: 'Judge', color: 'text-purple-400' },
+    { username: 'admin1', role: 'Admin', color: 'text-red-400' },
   ];
 
   const handleSubmit = async (e) => {
@@ -40,7 +40,7 @@ export default function LoginPage() {
 
   const quickFill = (uname) => {
     setUsername(uname);
-    setPassword('hackathon2024!');
+    setPassword('Passw0rd!');
     setError('');
   };
 
@@ -81,7 +81,8 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Demo Quick Fill */}
+          {/* Demo Quick Fill (only when built with VITE_DEMO_MODE=true) */}
+          {demoMode && (
           <div className="mb-6">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mb-2 text-center">
               Demo Accounts
@@ -101,6 +102,7 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -112,7 +114,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. alice_participant"
+                placeholder="Your username"
                 className="w-full glass-input rounded-xl px-4 py-3 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 required
                 autoComplete="username"
@@ -165,10 +167,12 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-[11px] text-slate-500 mt-5">
-            Demo password for all accounts:{' '}
-            <span className="font-mono text-slate-300">hackathon2024!</span>
-          </p>
+          {demoMode && (
+            <p className="text-center text-[11px] text-slate-500 mt-5">
+              Demo password for all accounts:{' '}
+              <span className="font-mono text-slate-300">Passw0rd!</span>
+            </p>
+          )}
         </div>
       </motion.div>
     </div>

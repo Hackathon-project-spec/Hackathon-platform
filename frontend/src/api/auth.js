@@ -4,6 +4,41 @@ const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080
 const REALM = import.meta.env.VITE_KEYCLOAK_REALM || 'hackathon';
 const CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'hackathon-frontend';
 
+// One-click demo account switcher (top bar + landing page buttons). Off by default:
+// a normal build shows no pre-made identities. Enable with VITE_DEMO_MODE=true.
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
+const ROLE_PRIORITY = ['ADMIN', 'ORGANIZER', 'JUDGE', 'PARTICIPANT'];
+
+/** Decode a JWT payload (no signature check -- the backend is what verifies tokens). */
+export function decodeJwt(token) {
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(part))));
+  } catch {
+    return null;
+  }
+}
+
+/** True only for a well-formed, unexpired token. */
+export function isTokenValid(token) {
+  const claims = token ? decodeJwt(token) : null;
+  return !!claims && typeof claims.exp === 'number' && claims.exp * 1000 > Date.now() + 5000;
+}
+
+/** Build a user object strictly from the token's own claims. */
+function userFromToken(token, fallbackUsername) {
+  const c = decodeJwt(token) || {};
+  const roles = c.realm_access?.roles || [];
+  return {
+    id: c.sub,
+    email: c.email || `${fallbackUsername}@hackathonraptors.dev`,
+    firstName: c.given_name || fallbackUsername,
+    lastName: c.family_name || '',
+    primaryRole: ROLE_PRIORITY.find((r) => roles.includes(r)) || 'PARTICIPANT',
+  };
+}
+
 export const DEMO_ACCOUNTS = [
   {
     username: 'participant1',
@@ -69,7 +104,7 @@ export const DEMO_ACCOUNTS = [
 
 /**
  * Log in via Keycloak Direct Access Grant (ROPC).
- * Falls back to offline simulated token if Keycloak is not currently reachable.
+ * Fails (no simulated session) if Keycloak is unreachable.
  */
 export async function loginWithCredentials(username, password) {
   const tokenUrl = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`;
@@ -98,20 +133,7 @@ export async function loginWithCredentials(username, password) {
         return { user: syncedUser, token: data.access_token, isRealBackend: true };
       } catch (syncErr) {
         console.warn('Backend sync failed, decoding JWT claims locally', syncErr);
-        const demoMatch = DEMO_ACCOUNTS.find(a => a.username === username);
-        const fallbackUser = demoMatch ? {
-          id: demoMatch.id,
-          email: demoMatch.email,
-          firstName: demoMatch.name.split(' ')[0],
-          lastName: demoMatch.name.split(' ')[1] || '',
-          primaryRole: demoMatch.role,
-        } : {
-          id: 'user-' + Date.now(),
-          email: `${username}@hackathonraptors.dev`,
-          firstName: username,
-          lastName: '',
-          primaryRole: 'PARTICIPANT',
-        };
+        const fallbackUser = userFromToken(data.access_token, username);
         setStoredUser(fallbackUser);
         return { user: fallbackUser, token: data.access_token, isRealBackend: true };
       }
@@ -120,23 +142,11 @@ export async function loginWithCredentials(username, password) {
       throw new Error(errJson.error_description || 'Invalid credentials');
     }
   } catch (err) {
-    // If Keycloak container is offline, provide smooth demo mode
-    const demoMatch = DEMO_ACCOUNTS.find(a => a.username.toLowerCase() === username.toLowerCase());
-    if (demoMatch && password === 'Passw0rd!') {
-      console.info('Keycloak offline: activating simulated offline session for', demoMatch.username);
-      const simulatedToken = createSimulatedJwt(demoMatch);
-      setStoredToken(simulatedToken);
-      const user = {
-        id: demoMatch.id,
-        email: demoMatch.email,
-        firstName: demoMatch.name.split(' ')[0],
-        lastName: demoMatch.name.split(' ')[1] || '',
-        primaryRole: demoMatch.role,
-      };
-      setStoredUser(user);
-      return { user, token: simulatedToken, isRealBackend: false, isOfflineSimulated: true };
+    // Never fabricate a session: if Keycloak is unreachable or rejects the login, fail.
+    if (err.name === 'TimeoutError' || err.name === 'TypeError') {
+      throw new Error('Cannot reach the authentication service. Is Keycloak running on ' + KEYCLOAK_URL + '?');
     }
-    throw new Error(err.message || 'Authentication service unreachable');
+    throw new Error(err.message || 'Authentication failed');
   }
 }
 
@@ -167,21 +177,4 @@ export async function listAllUsers() {
 export function logout() {
   setStoredToken(null);
   setStoredUser(null);
-}
-
-/**
- * Generates a mock JWT payload for seamless offline exploration
- */
-function createSimulatedJwt(account) {
-  const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({
-    sub: account.id,
-    email: account.email,
-    preferred_username: account.username,
-    given_name: account.name.split(' ')[0],
-    family_name: account.name.split(' ')[1] || '',
-    realm_access: { roles: [account.role] },
-    exp: Math.floor(Date.now() / 1000) + 86400,
-  }));
-  return `${header}.${payload}.simulated_signature`;
 }

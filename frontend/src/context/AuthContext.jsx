@@ -6,23 +6,20 @@ import {
   setStoredUser,
   checkGatewayHealth,
 } from '../api/client';
-import { loginWithCredentials, DEMO_ACCOUNTS, logout as apiLogout } from '../api/auth';
+import { loginWithCredentials, DEMO_ACCOUNTS, DEMO_MODE, isTokenValid, logout as apiLogout } from '../api/auth';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => getStoredToken());
-  const [user, setUser] = useState(() => {
-    const existing = getStoredUser();
-    // Default to Pat Participant for instantaneous demo exploration if nothing is stored
-    return existing || {
-      id: '00000000-0000-0000-0000-000000000005',
-      email: 'participant1@hackathonraptors.dev',
-      firstName: 'Pat',
-      lastName: 'Participant',
-      primaryRole: 'PARTICIPANT',
-    };
+  // Restore a session only if a real, unexpired token is stored. No default/seeded user.
+  const [token, setToken] = useState(() => {
+    const t = getStoredToken();
+    if (isTokenValid(t)) return t;
+    setStoredToken(null);
+    setStoredUser(null);
+    return null;
   });
+  const [user, setUser] = useState(() => (isTokenValid(getStoredToken()) ? getStoredUser() : null));
   const [isGatewayOnline, setIsGatewayOnline] = useState(false);
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -92,7 +89,8 @@ export function AuthProvider({ children }) {
       login,
       logout,
       switchDemoAccount,
-      demoAccounts: DEMO_ACCOUNTS,
+      demoAccounts: DEMO_MODE ? DEMO_ACCOUNTS : [],
+      demoMode: DEMO_MODE,
       loading
     }}>
       {children}

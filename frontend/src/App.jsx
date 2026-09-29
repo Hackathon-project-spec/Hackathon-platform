@@ -12,6 +12,7 @@ import Footer from './components/common/Footer';
 import Toast from './components/common/Toast';
 import BackendStatusBanner from './components/common/BackendStatusBanner';
 import DemoAccountBar from './components/demo/DemoAccountBar';
+import { DEMO_MODE } from './api/auth';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -25,8 +26,7 @@ import OrganizerPage from './pages/OrganizerPage';
 
 /**
  * Route guard – redirects to /login when no user is available.
- * In demo mode, AuthContext always seeds a default user so most routes
- * are reachable even before explicit login.
+ * Unauthenticated visitors are sent to /login (no default user is seeded).
  */
 function ProtectedRoute({ children, requiredRoles }) {
   const { user, role } = useAuth();
@@ -74,7 +74,7 @@ function AppRoutes() {
       {!isLoginPage && <BackendStatusBanner />}
 
       {/* Demo account quick-switch bar */}
-      {!isLoginPage && <DemoAccountBar />}
+      {!isLoginPage && DEMO_MODE && <DemoAccountBar />}
 
       <Routes>
         {/* Public landing page */}

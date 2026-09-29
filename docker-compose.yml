@@ -3,6 +3,7 @@ version: "3.8"
 x-java-common: &java-common
   environment:
     SPRING_PROFILES_ACTIVE: docker
+    SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
     JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
 
 networks:
@@ -71,16 +72,17 @@ services:
       KC_HOSTNAME: localhost
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
     volumes:
       - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
       - ./infra/keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
       - ./infra/keycloak/healthcheck.sh:/opt/keycloak/healthcheck.sh:ro
     healthcheck:
-      test: ["CMD", "/bin/bash", "/opt/keycloak/healthcheck.sh"]
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 40s
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,7 +94,7 @@ services:
   config-server:
     build: ./config-server
     container_name: hp-config-server
-    <<: *java-common
+#    <<: *java-common
     ports:
       - "8888:8888"
     networks: [hackathon-net]
@@ -173,6 +175,7 @@ services:
         VITE_KEYCLOAK_REALM: hackathon
         VITE_KEYCLOAK_CLIENT_ID: hackathon-frontend
         VITE_DEMO_EVENT_ID: "20000000-0000-0000-0000-000000000001"
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
     container_name: hp-frontend
     depends_on:
       api-gateway:
@@ -181,4 +184,4 @@ services:
         condition: service_healthy
     ports:
       - "3000:80"
-    networks: [hackathon-net]
+    networks: [ hackathon-net ]

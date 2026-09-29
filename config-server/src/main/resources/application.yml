@@ -11,6 +11,7 @@ spring:
       server:
         native:
           search-locations: classpath:/config-repo
+    import-check.enabled: false
 
 management:
   endpoints:

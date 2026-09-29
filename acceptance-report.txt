@@ -1,0 +1,170 @@
+HACKATHON RAPTORS PLATFORM — ACCEPTANCE REPORT
+================================================
+
+
+TIER 1 — CORE
+-------------
+[IMPLEMENTED]     Authentication and sessions — Keycloak (OIDC), JWT-based,
+                   no server-side session store. Local password accounts only
+                   (no external IdP; fully offline).
+[IMPLEMENTED]     Four roles — PARTICIPANT / JUDGE / ORGANIZER / ADMIN,
+                   defined as Keycloak realm roles, enforced per-service via
+                   @PreAuthorize.
+[IMPLEMENTED]     Event creation with configurable dates — registration
+                   open/close, hacking start, submission deadline, voting
+                   window, judging window, results-publish time, all
+                   independently settable (event-service).
+[IMPLEMENTED]     Tracks and prizes — CRUD under an event, prizes optionally
+                   scoped to a track.
+[IMPLEMENTED]     Team formation through invite links — tokenized,
+                   revocable, optionally expiring and use-limited invite
+                   links (team-service). Enforces max team size and "one
+                   team per user per event."
+[IMPLEMENTED]     Project submission with draft and edit functionality —
+                   DRAFT/SUBMITTED lifecycle, PATCH to edit either state
+                   before the deadline (submission-service).
+[IMPLEMENTED]     Deadline enforcement — both creating a draft and
+                   finalizing a submission are rejected once
+                   event.submissionDeadline has passed.
+[IMPLEMENTED]     Searchable public gallery — GET /api/gallery with eventId,
+                   trackId, and free-text query params, no auth required,
+                   returns only SUBMITTED (not DRAFT) projects.
+
+T1 self-assessment: substantially complete in source. NOT yet verified by an
+actual build/run. No automated test currently exercises the full T1 flow
+end-to-end (see "Tests" section below).
+
+
+TIER 2 — JUDGING
+-----------------
+[IMPLEMENTED]     Judge invitation and assignment — judges are Keycloak
+                   identities with the JUDGE role; assignment itself is
+                   algorithmic (see below), not a per-judge invite flow with
+                   its own token (no separate "invite a judge by email"
+                   endpoint exists — an organizer currently just needs the
+                   judge's user id, obtained via GET /api/users as
+                   ADMIN/ORGANIZER).
+[IMPLEMENTED]     Batch / algorithmic assignment — POST /api/judging/assign,
+                   greedy load-balancing across judges (see JUDGING.md).
+[IMPLEMENTED]     Weighted and configurable judging rubrics — arbitrary
+                   number of criteria per rubric, each with an independent
+                   weight and min/max score range.
+[IMPLEMENTED]     Backend-enforced role isolation — every service
+                   independently validates the JWT and checks roles; not
+                   solely a gateway-level check (see ARCHITECTURE.md).
+[IMPLEMENTED]     Judge progress dashboards — GET
+                   /api/judging/events/{id}/dashboard, per-judge completion
+                   counts and percentage.
+[IMPLEMENTED]     Cross-judge score normalization — per-judge z-score
+                   standardization (see JUDGING.md for the full mathematical
+                   description and stated limitations at low n).
+[IMPLEMENTED]     CSV export — assignments.csv, scores.csv, rankings.csv,
+                   all under /api/judging/events/{id}/export/.
+
+T2 self-assessment: the core algorithmic and mathematical work (assignment,
+normalization) is done and documented. The "judge invitation" sub-requirement
+is only partially addressed (no dedicated email-invite flow). Gallery/
+dashboard UI does not exist — everything above is a REST API; there is no
+frontend in this repository (see "What's not here" below).
+
+
+TIER 3 — PUBLIC
+-----------------
+[IMPLEMENTED]     Configurable community voting — one authenticated vote per
+                   identity per submission, idempotent re-votes, rate
+                   limited (30/hour/identity). "Configurable" is limited:
+                   the rate limit constant is not currently exposed as a
+                   per-event setting.
+[IMPLEMENTED]     Comments — plain threaded-by-submission comments, no
+                   moderation/deletion endpoint yet.
+[IMPLEMENTED]     Hidden results during voting — vote tallies are never
+                   returned by any public endpoint; only an organizer/
+                   admin-gated tally endpoint exists. (Design choice
+                   explained in JUDGING.md: this sidesteps needing a
+                   cross-service voting-window time check.)
+[PARTIAL]          Randomized project ordering — gallery currently sorts by
+                   submission time descending only; no random-order option
+                   is wired up yet (small addition to the existing search
+                   query, not implemented).
+[PARTIAL]          Rate limiting — implemented for voting specifically (see
+                   above); NOT implemented at the gateway or for other
+                   write endpoints (submissions, comments, invites).
+[IMPLEMENTED]     Duplicate detection — for votes specifically, via a
+                   database unique constraint (submission_id, voter_id).
+                   No duplicate-submission-content detection exists (e.g.
+                   flagging two teams with suspiciously similar
+                   descriptions) — that would be a distinct feature, not
+                   built.
+[NOT IMPLEMENTED] Audit trails — no queryable audit-log API. Kafka's event
+                   log is a partial, implicit audit trail for cross-service
+                   state changes, but nothing surfaces it as a feature.
+
+T3 self-assessment: roughly half-done. Voting + comments + hidden-results are
+real; randomized ordering, general rate limiting, and audit trails are gaps.
+
+
+TIER 4 — STRETCH
+------------------
+[PARTIAL]          REST API covering UI actions — since there is no UI in
+                   this repository, this is trivially true (the REST API
+                   *is* the interface) but that's a technicality, not a
+                   genuine T4 achievement.
+[NOT IMPLEMENTED] Webhooks.
+[NOT IMPLEMENTED] Certificate / record generation.
+[NOT IMPLEMENTED] Signed, publicly verifiable judge participation records.
+[NOT IMPLEMENTED] Embeddable gallery widget.
+[NOT IMPLEMENTED] Bulk import/export beyond the T2 CSV exports (no bulk
+                   *import* of any kind exists — e.g. CSV-importing a
+                   participant roster or a set of submissions).
+
+T4 self-assessment: not attempted, beyond what T2's CSV export incidentally
+covers. This is a deliberate prioritization, consistent with the spec's own
+"a clean, correct T2 is better than a broken T4" — the time available went
+into making T1/T2 real rather than spreading thin across T4.
+
+
+WHAT'S NOT HERE
+----------------
+- A React frontend now exists (frontend/, served via nginx in
+  docker-compose) covering login/demo-account switching, gallery, teams,
+  submission, judging, leaderboard, and an organizer panel. It has NOT been
+  exercised end-to-end against the live backend by the report's authors —
+  the frontend build itself is confirmed working (npm run build succeeds
+  cleanly), but a full click-through against a running docker-compose stack
+  is still pending manual verification. Treat UI claims with the same
+  "verify it yourself" caution as everything else in this report.
+- No automated tests currently in the repository beyond what's described
+  below. This is a real gap against the "Tests" submission requirement.
+- No CI configuration (GitHub Actions or similar).
+- No database migration tooling (Flyway/Liquibase) — see DATA-MODEL.md.
+
+
+TESTS
+------
+NOT YET WRITTEN beyond scaffolding intent. This is an honest gap, not an
+oversight being glossed over: the submission requirements list "Tests" and
+this repository does not yet meaningfully satisfy that line. Priority order
+for adding them: (1) NormalizationService — pure functions, easy to unit
+test with hand-computed expected z-scores; (2) AssignmentService — assert
+even load distribution and full coverage given N judges/M submissions;
+(3) an integration test per service's controller layer using
+@SpringBootTest + Testcontainers (Postgres, Kafka) once the base build is
+confirmed working.
+
+
+HOW TO ACTUALLY VERIFY THIS REPORT
+------------------------------------
+1. docker compose up --build   (confirm every service starts and stays up)
+2. Log in as participant1, create a team, invite participant2, accept the
+   invite as participant2, submit a project before the seeded deadline.
+3. Log in as organizer1, create a rubric, run POST /api/judging/assign.
+4. Log in as judge1 and judge2, submit scores for assigned submissions.
+5. GET /api/judging/events/{demoEventId}/rankings and the three CSV export
+   endpoints as organizer1.
+6. Attempt each write endpoint as a role that should be rejected (e.g.
+   PARTICIPANT calling POST /api/events) and confirm 403, not 200.
+7. Stop the network entirely (or use `docker network disconnect` on the
+   compose network's external access) and confirm the platform still works
+   end-to-end using the local Keycloak accounts.
+
+Demo event id: 20000000-0000-0000-0000-000000000001

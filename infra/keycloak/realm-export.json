@@ -1,0 +1,181 @@
+{
+  "realm": "hackathon",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "PARTICIPANT",
+        "description": "Registers, forms/joins teams, submits projects"
+      },
+      {
+        "name": "JUDGE",
+        "description": "Scores assigned submissions against rubrics"
+      },
+      {
+        "name": "ORGANIZER",
+        "description": "Creates/configures events, manages tracks, assigns judges"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Full platform administration"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "hackathon-gateway",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "hackathon-gateway-secret",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [
+        "http://localhost:9000/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "hackathon-frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "username": "admin1",
+      "email": "admin1@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alex",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "username": "organizer1",
+      "email": "organizer1@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ola",
+      "lastName": "Organizer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ORGANIZER"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "username": "judge1",
+      "email": "judge1@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jan",
+      "lastName": "Judge",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "JUDGE"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "username": "judge2",
+      "email": "judge2@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jamie",
+      "lastName": "Judge",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "JUDGE"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "username": "participant1",
+      "email": "participant1@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Pat",
+      "lastName": "Participant",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "PARTICIPANT"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000006",
+      "username": "participant2",
+      "email": "participant2@hackathonraptors.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Robin",
+      "lastName": "Participant",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passw0rd!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "PARTICIPANT"
+      ]
+    }
+  ],
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 36000
+}

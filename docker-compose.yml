@@ -1,0 +1,184 @@
+version: "3.8"
+
+x-java-common: &java-common
+  environment:
+    SPRING_PROFILES_ACTIVE: docker
+    JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
+
+networks:
+  hackathon-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+
+services:
+  # ---------------- Infra ----------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: hp-postgres
+    environment:
+      POSTGRES_USER: hackathon
+      POSTGRES_PASSWORD: hackathon
+      POSTGRES_MULTIPLE_DATABASES: userdb,eventdb,teamdb,submissiondb,judgingdb,notificationdb,keycloak
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-multi-db.sh:/docker-entrypoint-initdb.d/init-multi-db.sh
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hackathon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [hackathon-net]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: hp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: [hackathon-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: hp-kafka
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks: [hackathon-net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: hp-keycloak
+    # Re-applies infra/keycloak/realm-export.json on every boot (see entrypoint.sh)
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: hackathon
+      KC_DB_PASSWORD: hackathon
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - ./infra/keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+      - ./infra/keycloak/healthcheck.sh:/opt/keycloak/healthcheck.sh:ro
+    healthcheck:
+      test: ["CMD", "/bin/bash", "/opt/keycloak/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks: [hackathon-net]
+
+  # ---------------- Platform services ----------------
+  config-server:
+    build: ./config-server
+    container_name: hp-config-server
+    <<: *java-common
+    ports:
+      - "8888:8888"
+    networks: [hackathon-net]
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: hp-eureka-server
+    <<: *java-common
+    depends_on: [config-server]
+    ports:
+      - "8761:8761"
+    networks: [hackathon-net]
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: hp-api-gateway
+    <<: *java-common
+    depends_on:
+      eureka-server:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/hackathon
+    ports:
+      - "9000:9000"
+    networks: [hackathon-net]
+
+  user-service:
+    build: ./services/user-service
+    container_name: hp-user-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  event-service:
+    build: ./services/event-service
+    container_name: hp-event-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  team-service:
+    build: ./services/team-service
+    container_name: hp-team-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  submission-service:
+    build: ./services/submission-service
+    container_name: hp-submission-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  judging-service:
+    build: ./services/judging-service
+    container_name: hp-judging-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  notification-service:
+    build: ./services/notification-service
+    container_name: hp-notification-service
+    <<: *java-common
+    depends_on: [eureka-server, postgres, kafka]
+    networks: [hackathon-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:9000
+        VITE_KEYCLOAK_URL: http://localhost:8080
+        VITE_KEYCLOAK_REALM: hackathon
+        VITE_KEYCLOAK_CLIENT_ID: hackathon-frontend
+        VITE_DEMO_EVENT_ID: "20000000-0000-0000-0000-000000000001"
+    container_name: hp-frontend
+    depends_on:
+      api-gateway:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks: [hackathon-net]
